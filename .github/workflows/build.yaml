@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - v*
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 8
+      - uses: mymindstorm/setup-emsdk@v12
+      - uses: actions/setup-node@v3
+        with:
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+          node-version: latest
+      - uses: taiki-e/install-action@just
+      - run: pnpm install --frozen-lockfile
+      - run: just build rename
+      - uses: actions/upload-artifact@v3
+        with:
+          name: libav-gimbals.mov
+          path: gimbals.mov/*
+          if-no-files-found: error
+
+  release:
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v3
+        with:
+          name: libav-gimbals.mov
+          path: libav
+      - run: zip -r ${{ format('libav-{0}-gimbals.mov.zip', github.ref_name) }} .
+        working-directory: libav
+      - uses: softprops/action-gh-release@v1
+        with:
+          files: libav/*.zip
+          fail_on_unmatched_files: true
